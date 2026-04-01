@@ -25,6 +25,4 @@
 - 大矩阵下耗时增长更快，说明输入规模对性能影响显著。
 - 这为后续 attention 和 profiling 实验提供了最小基础。
 
-## 下一步计划
-- 用 PyTorch 复现相同实验
-- 加入 `torch.profiler` 分析耗时瓶颈
+
