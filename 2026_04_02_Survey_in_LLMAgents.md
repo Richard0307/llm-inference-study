@@ -18,10 +18,10 @@ status: ""
 
 | 问题 | 回答 | 页码/段落 |
 |------|------|-----------|
-| **解决什么问题？** | | |
-| **核心创新点？** | | |
-| **如何证明有效？** | | |
-| **代价与局限？** | | |
+| **解决什么问题？** |这篇论文解决的不是“提出一个更强的新 Agent”，而是系统梳理 LLM-based autonomous agents 这个快速增长但比较分散的研究领域：作者把已有工作统一到 construction、application、evaluation 三条主线下，并在 construction 中进一步回答两个核心问题：Agent 架构怎么设计，以及Agent 的能力如何获取和增强。 | |
+| **核心创新点？** | 核心创新有三层：第一，作者提出了一个统一的 Agent 架构框架，把已有研究抽象为 profiling、memory、planning、action 四个模块；第二，除了讲架构，还把 capability acquisition 单独整理成体系，说明 agent 不只是“怎么搭”，还包括“怎么变强”；第三，作者进一步建立了应用与评测的系统 taxonomy，把 social science、natural science、engineering 中的应用，以及 subjective / objective evaluation 方法统一整理出来。 | |
+| **如何证明有效？** |这是一篇 survey，所以它不是通过自己做实验来证明一个新模型有效，而是通过系统综述和分类组织能力来体现价值。具体来说，作者用统一框架去覆盖和归纳大量代表性工作，并整理了对应的对比表、应用版图和评测协议；在评测部分，还系统总结了主观评测与客观评测，包括 human annotation、Turing test、real-world simulation、social evaluation、multi-task evaluation、software testing 等。也就是说，这篇文章的“有效性”体现在：它能不能把分散文献讲清楚、归类清楚、连接起来。 | |
+| **代价与局限？** |这篇论文本身的局限在于：它不提出新的训练方法、算法或 benchmark，因此贡献主要是综述性和框架性；它给出的统一框架虽然很有解释力，但本质上仍是对既有研究的抽象。与此同时，作者也明确指出了这个领域本身的主要难点，包括 prompt framework robustness、hallucination、knowledge boundary 和 efficiency：也就是提示框架不稳、会幻觉、在人类模拟中可能“知道得太多”、以及多轮调用 LLM 导致效率低。 | |
 
 ---
 
