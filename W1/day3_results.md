@@ -3,37 +3,39 @@
 ## 中文版
 
 ### Summary
-- 模型：`claude-sonnet-4-20250514`
+- 后端：`Local Qwen via vLLM OpenAI API`
+- 模型：`Qwen/Qwen3-8B-AWQ`
 - 任务总数：`10`
 - 成功数：`8`
 - 失败数：`2`
 - 成功率：`80.00%`
 - 平均步骤数：`2.00`
-- 平均 token 消耗：`655.70`
+- 平均 token 消耗：`637.60`
+- 当前步数预算：`2`
 - 设计目标失败率：`20.00%`
 
 ### Success Table
 | Task ID | Type | Question | Expected | Final Answer | Steps | Tool Calls | Tokens |
 |---|---|---|---|---|---|---|---|
-| `T1` | `calculator` | Use the calculator tool to compute 17 * 9 - 25. | `128` | `128` | `2` | `1` | `644` |
-| `T2` | `calculator` | Use the calculator tool to compute (144 / 12) + 7. | `19` | `19` | `2` | `1` | `644` |
-| `T3` | `search` | From the notes tool, which city hosts the 2026 Research Summit? | `hangzhou` | `Hangzhou` | `2` | `1` | `679` |
-| `T4` | `search` | From the notes tool, what is the codename of Project Aurora? | `northstar` | `Northstar` | `2` | `1` | `626` |
-| `T6` | `search` | Use the notes tool to answer: on what day is demo day? | `thursday` | `Demo day is Thursday.` | `2` | `1` | `618` |
-| `T7` | `calculator` | Use the calculator tool to compute 81 / 9 + 6. | `15` | `15` | `2` | `1` | `648` |
-| `T8` | `search` | From the notes tool, what is Team Blue budget? | `3100` | `3100 dollars` | `2` | `1` | `643` |
-| `T9` | `search` | From the notes tool, in which month is Project Aurora reviewed internally? | `september` | `September` | `2` | `1` | `627` |
+| `T1` | `calculator` | Use the calculator tool to compute 17 * 9 - 25. | `128` | `128` | `2` | `1` | `623` |
+| `T2` | `calculator` | Use the calculator tool to compute (144 / 12) + 7. | `19` | `19` | `2` | `1` | `633` |
+| `T3` | `search` | From the notes tool, which city hosts the 2026 Research Summit? | `hangzhou` | `Hangzhou` | `2` | `1` | `660` |
+| `T4` | `search` | From the notes tool, what is the codename of Project Aurora? | `northstar` | `Northstar` | `2` | `1` | `613` |
+| `T6` | `search` | Use the notes tool to answer: on what day is demo day? | `thursday` | `Demo day is on Thursday.` | `2` | `1` | `615` |
+| `T7` | `calculator` | Use the calculator tool to compute 81 / 9 + 6. | `15` | `15` | `2` | `1` | `620` |
+| `T8` | `search` | From the notes tool, what is Team Blue budget? | `3100` | `3100` | `2` | `1` | `602` |
+| `T9` | `search` | From the notes tool, in which month is Project Aurora reviewed internally? | `september` | `September` | `2` | `1` | `619` |
 
 ### Failure Table
 | Task ID | Type | Question | Expected | Final Answer | Failure Reason | Steps | Tool Calls | Tokens |
 |---|---|---|---|---|---|---|---|---|
-| `T5` | `search+calculate` | Use the notes tool to find Team Red and Team Blue budgets, then compute their total with the calculator tool. You must use both tools. | `7300` | `N/A` | `step_budget_exceeded_before_finish` | `2` | `2` | `711` |
-| `T10` | `search+calculate` | Use the notes tool to find Team Red and Team Blue budgets, then compute the budget difference with the calculator tool. You must use both tools. | `1100` | `N/A` | `step_budget_exceeded_before_finish` | `2` | `2` | `717` |
+| `T5` | `search+calculate` | Use the notes tool to find Team Red and Team Blue budgets, then compute their total with the calculator tool. You must use both tools. | `7300` | `N/A` | `step_budget_exceeded_before_finish` | `2` | `2` | `691` |
+| `T10` | `search+calculate` | Use the notes tool to find Team Red and Team Blue budgets, then compute the budget difference with the calculator tool. You must use both tools. | `1100` | `N/A` | `step_budget_exceeded_before_finish` | `2` | `2` | `700` |
 
 ### Analysis
-- 这份结果记录的是真实任务、真实工具调用和真实 API token 消耗，不再是随机模拟器。
-- 当前的 20% 失败率是有意设计出来的：我把 `max_steps` 设成 `2`，同时放入了两道必须经历 `search_notes -> calculate -> finish` 三段流程的任务。
-- `step_budget_exceeded_before_finish` 会导致失败，是因为模型虽然已经完成了检索和计算，但在两步预算内没有机会再发出第三步 `finish`，因此无法正式提交最终答案。
+- 这份结果记录的是真实任务、真实工具调用和真实模型 token 消耗，不再是随机模拟器。
+- 当前的 20% 失败率是有意设计出来的：我把 `max_steps` 设成较小的预算，同时放入了两道必须经历 `search_notes -> calculate -> finish` 三段流程的任务。
+- `step_budget_exceeded_before_finish` 会导致失败，是因为模型虽然已经完成了检索和计算，但在当前预算内没有机会再发出第三步 `finish`，因此无法正式提交最终答案。
 - 从这个角度看，这类失败不是“模型完全不会做”，而是“当前 loop 预算和控制流设计不足以完成多工具任务”。
 - 本次失败原因分布：`step_budget_exceeded_before_finish` x 2
 - 除了 `step_budget_exceeded_before_finish`，后续实验里还可能出现这些失败原因：
@@ -48,36 +50,38 @@
 ## English Version
 
 ### Summary
-- Model: `claude-sonnet-4-20250514`
+- Backend: `Local Qwen via vLLM OpenAI API`
+- Model: `Qwen/Qwen3-8B-AWQ`
 - Task count: `10`
 - Success count: `8`
 - Failure count: `2`
 - Success rate: `80.00%`
 - Average steps: `2.00`
-- Average tokens: `655.70`
+- Average tokens: `637.60`
+- Step budget: `2`
 - Designed failure rate target: `20.00%`
 
 ### Success Table
 | Task ID | Type | Question | Expected | Final Answer | Steps | Tool Calls | Tokens |
 |---|---|---|---|---|---|---|---|
-| `T1` | `calculator` | Use the calculator tool to compute 17 * 9 - 25. | `128` | `128` | `2` | `1` | `644` |
-| `T2` | `calculator` | Use the calculator tool to compute (144 / 12) + 7. | `19` | `19` | `2` | `1` | `644` |
-| `T3` | `search` | From the notes tool, which city hosts the 2026 Research Summit? | `hangzhou` | `Hangzhou` | `2` | `1` | `679` |
-| `T4` | `search` | From the notes tool, what is the codename of Project Aurora? | `northstar` | `Northstar` | `2` | `1` | `626` |
-| `T6` | `search` | Use the notes tool to answer: on what day is demo day? | `thursday` | `Demo day is Thursday.` | `2` | `1` | `618` |
-| `T7` | `calculator` | Use the calculator tool to compute 81 / 9 + 6. | `15` | `15` | `2` | `1` | `648` |
-| `T8` | `search` | From the notes tool, what is Team Blue budget? | `3100` | `3100 dollars` | `2` | `1` | `643` |
-| `T9` | `search` | From the notes tool, in which month is Project Aurora reviewed internally? | `september` | `September` | `2` | `1` | `627` |
+| `T1` | `calculator` | Use the calculator tool to compute 17 * 9 - 25. | `128` | `128` | `2` | `1` | `623` |
+| `T2` | `calculator` | Use the calculator tool to compute (144 / 12) + 7. | `19` | `19` | `2` | `1` | `633` |
+| `T3` | `search` | From the notes tool, which city hosts the 2026 Research Summit? | `hangzhou` | `Hangzhou` | `2` | `1` | `660` |
+| `T4` | `search` | From the notes tool, what is the codename of Project Aurora? | `northstar` | `Northstar` | `2` | `1` | `613` |
+| `T6` | `search` | Use the notes tool to answer: on what day is demo day? | `thursday` | `Demo day is on Thursday.` | `2` | `1` | `615` |
+| `T7` | `calculator` | Use the calculator tool to compute 81 / 9 + 6. | `15` | `15` | `2` | `1` | `620` |
+| `T8` | `search` | From the notes tool, what is Team Blue budget? | `3100` | `3100` | `2` | `1` | `602` |
+| `T9` | `search` | From the notes tool, in which month is Project Aurora reviewed internally? | `september` | `September` | `2` | `1` | `619` |
 
 ### Failure Table
 | Task ID | Type | Question | Expected | Final Answer | Failure Reason | Steps | Tool Calls | Tokens |
 |---|---|---|---|---|---|---|---|---|
-| `T5` | `search+calculate` | Use the notes tool to find Team Red and Team Blue budgets, then compute their total with the calculator tool. You must use both tools. | `7300` | `N/A` | `step_budget_exceeded_before_finish` | `2` | `2` | `711` |
-| `T10` | `search+calculate` | Use the notes tool to find Team Red and Team Blue budgets, then compute the budget difference with the calculator tool. You must use both tools. | `1100` | `N/A` | `step_budget_exceeded_before_finish` | `2` | `2` | `717` |
+| `T5` | `search+calculate` | Use the notes tool to find Team Red and Team Blue budgets, then compute their total with the calculator tool. You must use both tools. | `7300` | `N/A` | `step_budget_exceeded_before_finish` | `2` | `2` | `691` |
+| `T10` | `search+calculate` | Use the notes tool to find Team Red and Team Blue budgets, then compute the budget difference with the calculator tool. You must use both tools. | `1100` | `N/A` | `step_budget_exceeded_before_finish` | `2` | `2` | `700` |
 
 ### Analysis
-- These results come from real tasks, real tool calls, and real API token usage rather than a simulator.
-- The current 20% failure rate is intentional: `max_steps` is set to `2` while two tasks require the full `search_notes -> calculate -> finish` chain.
+- These results come from real tasks, real tool calls, and real model token usage rather than a simulator.
+- The current 20% failure rate is intentional: `max_steps` is kept small while two tasks require the full `search_notes -> calculate -> finish` chain.
 - `step_budget_exceeded_before_finish` causes failure because the agent may already have searched and calculated, but it still needs one more turn to submit the final answer with `finish`.
 - In other words, this is not necessarily a “model cannot solve the task” failure. It is a control-budget failure caused by the current loop design.
 - Failure reason breakdown: `step_budget_exceeded_before_finish` x 2

@@ -10,16 +10,25 @@ import os
 import pathlib
 import re
 import statistics
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
-from anthropic import Anthropic
+try:
+    from anthropic import Anthropic
+except Exception:  # pragma: no cover - local-qwen mode should still work
+    Anthropic = None  # type: ignore[assignment]
 
 
-MODEL_NAME = "claude-sonnet-4-20250514"
+DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
+DEFAULT_LOCAL_MODEL = "Qwen/Qwen3-8B-AWQ"
+DEFAULT_LOCAL_BASE_URL = "http://127.0.0.1:8000/v1/chat/completions"
+DEFAULT_BACKEND = os.getenv("DAY3_BACKEND", "local-qwen")
 DEFAULT_MAX_STEPS = 2
-DEFAULT_MAX_TOKENS = 220
-RESULTS_PATH = pathlib.Path(__file__).resolve().parent / "day3_results.md"
+DEFAULT_MAX_OUTPUT_TOKENS = 220
+DEFAULT_TIMEOUT_SECONDS = 60
+DEFAULT_RESULTS_PATH = pathlib.Path(__file__).resolve().parent / "day3_results.md"
 
 
 SYSTEM_PROMPT = """You are a minimal research agent.
@@ -37,6 +46,7 @@ Rules:
 - Use exactly these keys: thought, action, action_input, final_answer.
 - action must be one of: calculate, search_notes, finish.
 - Keep thought short and concrete.
+- Do not include markdown fences, XML tags, or any explanation outside JSON.
 - When action is finish, put the answer in final_answer.
 """
 
@@ -104,6 +114,149 @@ TASKS = [
 
 class ToolError(RuntimeError):
     pass
+
+
+class BackendError(RuntimeError):
+    pass
+
+
+class AgentBackend(Protocol):
+    backend_name: str
+    model_name: str
+
+    def decide(
+        self,
+        task: Task,
+        history: list[dict[str, str]],
+        tool_used: bool,
+        max_output_tokens: int,
+    ) -> tuple[dict[str, Any], int]:
+        ...
+
+
+class AnthropicBackend:
+    backend_name = "Anthropic API"
+
+    def __init__(self, model_name: str, temperature: float) -> None:
+        if Anthropic is None:
+            raise BackendError("The anthropic package is not available in the current environment.")
+        if not os.getenv("ANTHROPIC_API_KEY"):
+            raise BackendError(
+                "ANTHROPIC_API_KEY is not available in the current shell. "
+                "Run inside `conda activate llm-infer` or use `conda run -n llm-infer ...`."
+            )
+        self.client = Anthropic()
+        self.model_name = model_name
+        self.temperature = temperature
+
+    def decide(
+        self,
+        task: Task,
+        history: list[dict[str, str]],
+        tool_used: bool,
+        max_output_tokens: int,
+    ) -> tuple[dict[str, Any], int]:
+        response = self.client.messages.create(
+            model=self.model_name,
+            max_tokens=max_output_tokens,
+            temperature=self.temperature,
+            system=SYSTEM_PROMPT,
+            messages=[
+                {
+                    "role": "user",
+                    "content": build_user_prompt(task=task, history=history, tool_used=tool_used),
+                }
+            ],
+        )
+        text_blocks = [block.text for block in response.content if getattr(block, "type", "") == "text"]
+        raw_text = "\n".join(text_blocks)
+        parsed = extract_json_block(raw_text)
+        tokens = response.usage.input_tokens + response.usage.output_tokens
+        return parsed, tokens
+
+
+class LocalQwenBackend:
+    backend_name = "Local Qwen via vLLM OpenAI API"
+
+    def __init__(
+        self,
+        model_name: str,
+        base_url: str,
+        temperature: float,
+        timeout_seconds: int,
+        api_key: str,
+    ) -> None:
+        self.model_name = model_name
+        self.base_url = base_url
+        self.temperature = temperature
+        self.timeout_seconds = timeout_seconds
+        self.api_key = api_key
+
+    def decide(
+        self,
+        task: Task,
+        history: list[dict[str, str]],
+        tool_used: bool,
+        max_output_tokens: int,
+    ) -> tuple[dict[str, Any], int]:
+        user_prompt = build_user_prompt(task=task, history=history, tool_used=tool_used)
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"{user_prompt}\n/no_think"},
+            ],
+            "temperature": self.temperature,
+            "max_tokens": max_output_tokens,
+            "stream": False,
+        }
+        request = urllib.request.Request(
+            url=self.base_url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            raise BackendError(f"Local Qwen request failed with HTTP {exc.code}: {body}") from exc
+        except urllib.error.URLError as exc:
+            raise BackendError(
+                "Could not reach the local vLLM server. Start it first, for example:\n"
+                "`bash W1/start_qwen3_8b_vllm.sh`"
+            ) from exc
+
+        try:
+            message = data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise BackendError(f"Unexpected local Qwen response payload: {data}") from exc
+
+        raw_text = flatten_message_content(message)
+        parsed = extract_json_block(raw_text)
+        usage = data.get("usage", {})
+        tokens = int(usage.get("prompt_tokens", 0)) + int(usage.get("completion_tokens", 0))
+        return parsed, tokens
+
+
+def flatten_message_content(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict):
+                text = item.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+            elif isinstance(item, str):
+                parts.append(item)
+        return "\n".join(parts)
+    return str(content)
 
 
 def safe_calculate(expression: str) -> str:
@@ -208,21 +361,6 @@ def build_user_prompt(task: Task, history: list[dict[str, str]], tool_used: bool
     )
 
 
-def ask_model(client: Anthropic, task: Task, history: list[dict[str, str]], tool_used: bool) -> tuple[dict[str, Any], int]:
-    response = client.messages.create(
-        model=MODEL_NAME,
-        max_tokens=DEFAULT_MAX_TOKENS,
-        temperature=0,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": build_user_prompt(task, history, tool_used)}],
-    )
-    text_blocks = [block.text for block in response.content if getattr(block, "type", "") == "text"]
-    raw_text = "\n".join(text_blocks)
-    parsed = extract_json_block(raw_text)
-    tokens = response.usage.input_tokens + response.usage.output_tokens
-    return parsed, tokens
-
-
 def evaluate_result(task: Task, final_answer: str) -> bool:
     normalized_expected = normalize_answer(task.expected_answer)
     normalized_final = normalize_answer(final_answer)
@@ -272,7 +410,12 @@ def build_failure_reason(
     return True, "success"
 
 
-def run_task(client: Anthropic, task: Task, max_steps: int) -> dict[str, Any]:
+def run_task(
+    backend: AgentBackend,
+    task: Task,
+    max_steps: int,
+    max_output_tokens: int,
+) -> dict[str, Any]:
     history: list[dict[str, str]] = []
     total_tokens = 0
     tool_calls = 0
@@ -283,7 +426,12 @@ def run_task(client: Anthropic, task: Task, max_steps: int) -> dict[str, Any]:
 
     for step in range(1, max_steps + 1):
         tool_used = tool_calls > 0
-        decision, tokens = ask_model(client, task, history, tool_used)
+        decision, tokens = backend.decide(
+            task=task,
+            history=history,
+            tool_used=tool_used,
+            max_output_tokens=max_output_tokens,
+        )
         total_tokens += tokens
 
         thought = str(decision.get("thought", "")).strip()
@@ -377,7 +525,12 @@ def run_task(client: Anthropic, task: Task, max_steps: int) -> dict[str, Any]:
     }
 
 
-def render_markdown(results: list[dict[str, Any]]) -> str:
+def render_markdown(
+    results: list[dict[str, Any]],
+    backend_name: str,
+    model_name: str,
+    max_steps: int,
+) -> str:
     success_count = sum(1 for result in results if result["success"])
     success_rate = success_count / len(results)
     average_steps = statistics.mean(result["steps"] for result in results)
@@ -396,13 +549,15 @@ def render_markdown(results: list[dict[str, Any]]) -> str:
         "## 中文版",
         "",
         "### Summary",
-        f"- 模型：`{MODEL_NAME}`",
+        f"- 后端：`{backend_name}`",
+        f"- 模型：`{model_name}`",
         f"- 任务总数：`{len(results)}`",
         f"- 成功数：`{success_count}`",
         f"- 失败数：`{len(failure_rows)}`",
         f"- 成功率：`{success_rate:.2%}`",
         f"- 平均步骤数：`{average_steps:.2f}`",
         f"- 平均 token 消耗：`{average_tokens:.2f}`",
+        f"- 当前步数预算：`{max_steps}`",
         f"- 设计目标失败率：`20.00%`",
         "",
         "### Success Table",
@@ -434,14 +589,14 @@ def render_markdown(results: list[dict[str, Any]]) -> str:
         )
 
     lines.extend(["", "### Analysis"])
-    lines.append("- 这份结果记录的是真实任务、真实工具调用和真实 API token 消耗，不再是随机模拟器。")
+    lines.append("- 这份结果记录的是真实任务、真实工具调用和真实模型 token 消耗，不再是随机模拟器。")
     lines.append(
-        "- 当前的 20% 失败率是有意设计出来的：我把 `max_steps` 设成 `2`，同时放入了两道必须经历 "
+        "- 当前的 20% 失败率是有意设计出来的：我把 `max_steps` 设成较小的预算，同时放入了两道必须经历 "
         "`search_notes -> calculate -> finish` 三段流程的任务。"
     )
     lines.append(
         "- `step_budget_exceeded_before_finish` 会导致失败，是因为模型虽然已经完成了检索和计算，"
-        "但在两步预算内没有机会再发出第三步 `finish`，因此无法正式提交最终答案。"
+        "但在当前预算内没有机会再发出第三步 `finish`，因此无法正式提交最终答案。"
     )
     lines.append(
         "- 从这个角度看，这类失败不是“模型完全不会做”，而是“当前 loop 预算和控制流设计不足以完成多工具任务”。"
@@ -459,13 +614,15 @@ def render_markdown(results: list[dict[str, Any]]) -> str:
     lines.append("- 检索噪声与歧义：如果 notes 更长、更乱或有冲突信息，search 工具可能把模型带偏。")
 
     lines.extend(["", "---", "", "## English Version", "", "### Summary"])
-    lines.append(f"- Model: `{MODEL_NAME}`")
+    lines.append(f"- Backend: `{backend_name}`")
+    lines.append(f"- Model: `{model_name}`")
     lines.append(f"- Task count: `{len(results)}`")
     lines.append(f"- Success count: `{success_count}`")
     lines.append(f"- Failure count: `{len(failure_rows)}`")
     lines.append(f"- Success rate: `{success_rate:.2%}`")
     lines.append(f"- Average steps: `{average_steps:.2f}`")
     lines.append(f"- Average tokens: `{average_tokens:.2f}`")
+    lines.append(f"- Step budget: `{max_steps}`")
     lines.append("- Designed failure rate target: `20.00%`")
     lines.extend(["", "### Success Table"])
     lines.append("| Task ID | Type | Question | Expected | Final Answer | Steps | Tool Calls | Tokens |")
@@ -488,9 +645,9 @@ def render_markdown(results: list[dict[str, Any]]) -> str:
         )
 
     lines.extend(["", "### Analysis"])
-    lines.append("- These results come from real tasks, real tool calls, and real API token usage rather than a simulator.")
+    lines.append("- These results come from real tasks, real tool calls, and real model token usage rather than a simulator.")
     lines.append(
-        "- The current 20% failure rate is intentional: `max_steps` is set to `2` while two tasks require the full "
+        "- The current 20% failure rate is intentional: `max_steps` is kept small while two tasks require the full "
         "`search_notes -> calculate -> finish` chain."
     )
     lines.append(
@@ -515,33 +672,82 @@ def render_markdown(results: list[dict[str, Any]]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def write_results(results: list[dict[str, Any]]) -> pathlib.Path:
-    markdown = render_markdown(results)
-    RESULTS_PATH.write_text(markdown, encoding="utf-8")
-    return RESULTS_PATH
-
-
-def ensure_api_key() -> None:
-    if os.getenv("ANTHROPIC_API_KEY"):
-        return
-    raise RuntimeError(
-        "ANTHROPIC_API_KEY is not available in the current shell. "
-        "Run this script inside the llm-infer environment, for example: "
-        "`conda run -n llm-infer python W1/day3.py`."
+def write_results(
+    results: list[dict[str, Any]],
+    backend_name: str,
+    model_name: str,
+    max_steps: int,
+    output_path: pathlib.Path,
+) -> pathlib.Path:
+    markdown = render_markdown(
+        results=results,
+        backend_name=backend_name,
+        model_name=model_name,
+        max_steps=max_steps,
     )
+    output_path.write_text(markdown, encoding="utf-8")
+    return output_path
+
+
+def create_backend(args: argparse.Namespace) -> AgentBackend:
+    if args.backend == "anthropic":
+        return AnthropicBackend(model_name=args.anthropic_model, temperature=args.temperature)
+    if args.backend == "local-qwen":
+        return LocalQwenBackend(
+            model_name=args.local_model,
+            base_url=args.local_base_url,
+            temperature=args.temperature,
+            timeout_seconds=args.timeout_seconds,
+            api_key=args.local_api_key,
+        )
+    raise BackendError(f"Unsupported backend: {args.backend}")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run a minimal task-driven agent loop with either Anthropic or a local Qwen backend."
+    )
+    parser.add_argument(
+        "--backend",
+        choices=["anthropic", "local-qwen"],
+        default=DEFAULT_BACKEND,
+        help="Model backend to use. Defaults to DAY3_BACKEND or local-qwen.",
+    )
+    parser.add_argument("--anthropic-model", default=DEFAULT_ANTHROPIC_MODEL)
+    parser.add_argument("--local-model", default=os.getenv("LOCAL_QWEN_MODEL", DEFAULT_LOCAL_MODEL))
+    parser.add_argument("--local-base-url", default=os.getenv("LOCAL_LLM_BASE_URL", DEFAULT_LOCAL_BASE_URL))
+    parser.add_argument("--local-api-key", default=os.getenv("LOCAL_LLM_API_KEY", "EMPTY"))
+    parser.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
+    parser.add_argument("--max-output-tokens", type=int, default=DEFAULT_MAX_OUTPUT_TOKENS)
+    parser.add_argument("--timeout-seconds", type=int, default=DEFAULT_TIMEOUT_SECONDS)
+    parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--output", default=str(DEFAULT_RESULTS_PATH))
+    return parser.parse_args()
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run a minimal task-driven agent loop with Claude.")
-    parser.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
-    args = parser.parse_args()
-
-    ensure_api_key()
-    client = Anthropic()
-    results = [run_task(client, task, max_steps=args.max_steps) for task in TASKS]
-    results_path = write_results(results)
+    args = parse_args()
+    backend = create_backend(args)
+    results = [
+        run_task(
+            backend=backend,
+            task=task,
+            max_steps=args.max_steps,
+            max_output_tokens=args.max_output_tokens,
+        )
+        for task in TASKS
+    ]
+    results_path = write_results(
+        results=results,
+        backend_name=backend.backend_name,
+        model_name=backend.model_name,
+        max_steps=args.max_steps,
+        output_path=pathlib.Path(args.output).resolve(),
+    )
 
     print(f"Saved markdown results to: {results_path}")
+    print(f"Backend\t{backend.backend_name}")
+    print(f"Model\t{backend.model_name}")
     print("TaskID\tSuccess\tSteps\tToolCalls\tTokens\tFailureReason\tFinalAnswer")
     for result in results:
         print(
