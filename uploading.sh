@@ -9,6 +9,7 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 fi
 
 branch="$(git rev-parse --abbrev-ref HEAD)"
+ssh_over_443_cmd='ssh -o Hostname=ssh.github.com -o Port=443 -o StrictHostKeyChecking=accept-new'
 
 # 2. 获取 Commit 信息
 commit_msg="${1:-}"
@@ -21,14 +22,12 @@ fi
 
 echo "正在清理并准备上传列表..."
 
-# 第一步：先把所有东西都加入暂存区（包括 README.md 的修改）
+# 第一步：先把所有东西都加入暂存区
 git add .
 
-# 第二步：强制从暂存区中“拿掉”.gitignore
-# 这样 Git 就会认为：除了 .gitignore，其他东西都要提交
-if git ls-files --error-unmatch .gitignore >/dev/null 2>&1; then
-    git rm --cached .gitignore >/dev/null 2>&1
-fi
+# 第二步：强制从暂存区中“拿掉” .gitignore
+# 无论它是已跟踪文件还是新加入的未跟踪文件，都不要把它带进 commit
+git reset -q HEAD -- .gitignore >/dev/null 2>&1 || true
 
 # --- 核心修复逻辑结束 ---
 
@@ -41,6 +40,6 @@ else
 fi
 
 # 4. 推送
-echo "正在推送到远程..."
-git push origin "$branch"
+echo "正在通过 GitHub SSH 443 端口推送到远程..."
+GIT_SSH_COMMAND="$ssh_over_443_cmd" git push origin "$branch"
 echo "🚀 上传完成：origin/$branch"
