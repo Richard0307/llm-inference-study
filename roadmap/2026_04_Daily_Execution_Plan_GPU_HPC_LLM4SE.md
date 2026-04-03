@@ -14,6 +14,8 @@
 - 学会记录任务成功率和规划成本
 - 完成一个最小的 Agent 规划策略对比项目
 - 形成第一套可复用的 `llm_agent_eval_harness`
+- 设计并初步实现 plan-action deviation detector（论文核心机制）
+- 建立系统性的 Agent failure taxonomy（论文分析支撑）
 
 ---
 
@@ -121,11 +123,13 @@
 - 要做：
   - 比较"直接回答"vs "链式推理（CoT）"
   - 固定样本、固定模型
+  - **新增**：在每步记录 `planned_action` vs `actual_action`，为后续 deviation 分析积累数据
 - 当天输出：
   - `01_planning_strategy_baseline.py`
   - 1 张对比表
 - 完成标准：
   - 至少完成 2 组规划策略对照
+  - 结果表中包含 plan-action alignment 字段
 
 ### 4 月 8 日（周三）
 
@@ -188,16 +192,19 @@
 
 ### 4 月 13 日（周一）
 
-- 主任务：准备进入 Reflexion 实验
+- 主任务：准备进入 Reflexion 实验 + 偏差分析铺垫
 - 要做：
   - 整理失败案例样本（ReAct 答错的）
   - 设计最小反思触发机制
   - 写下 2 个 Reflexion 实验的待验证假设
+  - **新增**：对 W2 所有失败案例做 plan-action deviation 标注，形成初始偏差数据集
+  - **新增**：写下 1 个关于"能否在失败发生前检测偏差"的假设
 - 当天输出：
-  - 失败案例清单
-  - 假设文档
+  - 失败案例清单（含 deviation 标注）
+  - 假设文档（含 deviation detector 假设）
 - 完成标准：
   - 你知道 W3 的实验从哪里开始
+  - 你有一份带偏差标注的失败案例集
 
 ---
 
@@ -252,15 +259,18 @@
 
 ### 4 月 18 日（周六）
 
-- 主任务：闭卷回忆 + failure taxonomy
+- 主任务：闭卷回忆 + failure taxonomy（论文方向2核心产出）
 - 要做：
   - 画出 Reflexion 的完整控制流
   - 总结 Agent 规划失败的主要类型
+  - **新增**：对每类失败标注"是否可被在线检测"（detectable before failure / only post-hoc）
+  - **新增**：区分 plan-level failure vs execution-level failure
 - 当天输出：
   - 1 张控制流图
-  - 1 份 Agent failure taxonomy 草稿
+  - 1 份 Agent failure taxonomy 草稿（含可检测性标注）
 - 完成标准：
   - 能说出至少 4 类 Agent 规划失败模式
+  - 其中至少 2 类标注为"可在线检测"——这就是 deviation detector 的目标失败类型
 
 ### 4 月 19 日（周日）
 
@@ -274,99 +284,112 @@
 
 ### 4 月 20 日（周一）
 
-- 主任务：三路规划策略综合对比
+- 主任务：三路规划策略综合对比（论文方向4核心产出）
 - 要做：
   - 把 CoT / ReAct / Reflexion 放在同一任务集上重跑
   - 统一结果格式，做完整三路对比表
+  - **新增**：统一记录每个 agent 的 plan-action deviation rate（偏差率）
+  - **新增**：按 failure taxonomy 分类统计三种架构的失败分布差异
 - 当天输出：
-  - 三路对比结果表
+  - 三路对比结果表（含 deviation rate 列）
+  - 1 张"架构 × 失败类型"热力图草稿
 - 完成标准：
   - 有清楚的三路规划策略对比数据
+  - 能回答"哪种架构在哪类失败上最脆弱"
 
 ---
 
-## W4：4/21 - 4/27
+## W4：4/21 - 4/27（论文核心机制周：Plan-Action Deviation Detector）
 
 ### 4 月 21 日（周二）
 
-- 主任务：加入最小工具使用
+- 主任务：设计 deviation detector 架构
 - 要做：
-  - 给 Agent 加 1-2 个简单工具（如计算器、搜索）
-  - 测工具调用准确率
+  - 定义 deviation 的形式化表示：`(planned_action, actual_action, context) → deviation_score`
+  - 设计 detector 的两种候选方案：
+    - 方案 A：rule-based（基于 action type mismatch + step count heuristic）
+    - 方案 B：LLM-as-judge（用同一个或更小的 LLM 做在线判断）
+  - 确定 detector 的输入输出接口
 - 当天输出：
-  - `03_tool_use_baseline.py`
-  - 工具调用准确率表
+  - `03_deviation_detector_design.md`（含架构图）
+  - detector 接口定义代码
 - 完成标准：
-  - 至少有 1 个工具能稳定被 Agent 调用
+  - 能画出 detector 嵌入 agent loop 的位置图
 
 ### 4 月 22 日（周三）
 
-- 主任务：工具使用消融
+- 主任务：实现 deviation detector v1
 - 要做：
-  - 比较"无工具"vs "有工具"的任务成功率
-  - 统计工具调用错误类型
+  - 实现 rule-based detector（方案 A）
+  - 实现 LLM-as-judge detector（方案 B）
+  - 在 W3 的三路对比数据上回测：detector 能否在失败发生前识别偏差
 - 当天输出：
-  - 工具使用消融对比表
+  - `03_deviation_detector.py`
+  - detector 回测准确率表（precision / recall）
 - 完成标准：
-  - 能说出工具使用在哪类任务上值得
+  - detector 在已有数据上能检出 >50% 的失败前偏差信号
 
 ### 4 月 23 日（周四）
 
-- 主任务：读 `AgentBench`
+- 主任务：精读 process supervision 相关论文
 - 要做：
-  - 重点理解多任务多环境评测框架的设计
-  - 写 1 张 Agent 评测框架设计卡
+  - 精读 `Let's Verify Step by Step`（OpenAI process reward model）
+  - 对比 outcome supervision vs process supervision 的设计哲学
+  - 思考你的 detector 和 process reward model 的关系与区别
 - 当天输出：
   - 结构化论文笔记
-  - 1 张评测框架卡
+  - 1 张"你的 detector vs PRM vs Reflexion"对比卡
 - 完成标准：
-  - 能解释你的小评测框架和标准 AgentBench 的关系
+  - 能回答"你的方法和 process reward model 有什么不同"（审稿人必问）
 
 ### 4 月 24 日（周五）
 
-- 主任务：整理 4 月 mini project 初稿
+- 主任务：detector 集成实验 + 论文骨架
 - 要做：
-  - 固定任务集、固定 baseline、固定指标
-  - 写项目结构和 README 大纲
+  - 把 detector 嵌入 ReAct 和 Reflexion 的 agent loop
+  - 测试"检测到偏差后自动触发纠正"的效果
+  - 写论文 1-page outline（Title / Abstract sketch / 5 sections）
 - 当天输出：
-  - `03_april_mini_project/` 目录框架
+  - detector-integrated agent loop 实验结果
+  - `paper_outline_v1.md`
 - 完成标准：
-  - 项目已经有可以展示的形状
+  - 有"无 detector vs 有 detector"的成功率对比数据
 
 ### 4 月 25 日（周六）
 
-- 主任务：闭卷回忆 + 仓库整理
+- 主任务：闭卷回忆 + 结果整理
 - 要做：
-  - 闭卷讲一遍 4 月主线（规划策略 + 工具使用）
-  - 清理脚本命名和输出目录
+  - 闭卷讲一遍论文故事线：问题 → 现有方法局限 → 你的 detector → 实验证据
+  - 整理所有实验数据到统一格式
+  - 画 1 张核心结果图（架构 × detector × 成功率/token成本）
 - 当天输出：
   - 1 份回忆记录
-  - 更整洁的项目目录
+  - 1 张论文核心结果图草稿
 - 完成标准：
-  - 你能 5 分钟讲清 4 月做了什么
+  - 能 5 分钟讲清论文的完整故事
 
 ### 4 月 26 日（周日）
 
-- 主任务：写 4 月阶段输出
+- 主任务：写阶段性复盘 + 外部输出
 - 要做：
-  - 写一篇阶段性复盘
-  - 主题：从基础 LLM 到规划驱动的 Agent 的第一步
+  - 写一篇阶段复盘，主题：从 agent loop 到 plan-action monitor 的研究路径
+  - 可同步写知乎文章："为什么 LLM Agent 需要一个'计划监督员'"
 - 当天输出：
   - 1 篇阶段复盘
 - 完成标准：
-  - 文中能同时写出规划效果和成本视角
+  - 文中能同时写出 detector 的效果和成本视角
 
 ### 4 月 27 日（周一）
 
 - 主任务：4 月 mini project 收口
 - 要做：
-  - 重跑关键实验（三路规划策略对比）
-  - 补 1 份 mini report
+  - 重跑关键实验（四路对比：CoT / ReAct / Reflexion / Reflexion+Detector）
+  - 补 1 份 mini report，按论文结构组织
   - 做本月核心提交
 - 当天输出：
-  - `03_april_report.md`
+  - `03_april_report.md`（含论文 framing 视角）
 - 完成标准：
-  - 4 月成果可以给别人看了
+  - 4 月成果可以作为论文实验部分的初稿素材
 
 ---
 
@@ -374,50 +397,58 @@
 
 ### 4 月 28 日（周二）
 
-- 主任务：预读 `Tree of Thoughts`
+- 主任务：预读 `Tree of Thoughts` + detector 在 ToT 上的适配思考
 - 要做：
   - 重点理解树状规划与线性规划的设计差异
+  - 思考：deviation detector 在分支搜索场景下该如何工作
   - 写 1 张方法对比卡
 - 当天输出：
   - 结构化论文笔记
-  - 1 张规划策略扩展卡
+  - 1 张规划策略扩展卡（含 detector 适配笔记）
 - 完成标准：
   - 能讲清"为什么有时候树状规划比线性更好"
+  - 能说出 detector 在 ToT 上的一个设计挑战
 
 ### 4 月 29 日（周三）
 
-- 主任务：ToT 风格 baseline 预实现
+- 主任务：ToT 风格 baseline 预实现 + detector 扩展
 - 要做：
   - 做一个最简版 BFS 思路链实验
-  - 固定任务集做实验
+  - 尝试把 detector 嵌入 ToT loop，形成第 5 路对比
 - 当天输出：
   - `04_tree_planning_preview.py`
+  - ToT + detector 初步结果（即使不完整也记录）
 - 完成标准：
   - 跑通最简版树状规划
 
 ### 4 月 30 日（周四）
 
-- 主任务：4 月总复盘 + 5 月开题
+- 主任务：4 月总复盘 + 论文路线图 + 5 月开题
 - 要做：
   - 写 4 月总结
-  - 选定 5 月 mini project 题目
-  - 写下 2 个 5 月待验证假设（关于规划策略消融）
+  - **新增**：写论文 related work 草稿大纲（列出需要对比的 5-8 篇核心论文）
+  - **新增**：明确 5 月目标——完善 detector 实验 + 写初稿
+  - 写下 2 个 5 月待验证假设（关于 detector 的泛化性和成本效率）
 - 当天输出：
   - `2026_04_monthly_review.md`
-  - `2026_05_hypotheses.md`
+  - `2026_05_hypotheses.md`（聚焦 detector 论文）
+  - `paper_related_work_outline.md`
 - 完成标准：
   - 你知道 5 月要验证什么
+  - 论文从"想法"变成了"有骨架的草稿"
 
 ---
 
 ## 4 月结束时你应该拿到什么
 
 - 一个稳定可复用的最小 `llm_agent_eval_harness`
-- 一个能跑的 Agent 规划策略对比框架（CoT / ReAct / Reflexion）
-- 一套任务成功率 + 规划步数 + token 成本联合指标
-- 一个最小工具使用实验
+- 一个能跑的 Agent 规划策略对比框架（CoT / ReAct / Reflexion / ToT）
+- 一套任务成功率 + 规划步数 + token 成本 + deviation rate 联合指标
+- **一个 plan-action deviation detector 原型**（rule-based + LLM-as-judge 两版）
+- **一组"无 detector vs 有 detector"的对比实验数据**
 - 至少 4 份像样的实验记录或 mini memo
-- 至少 1 套 Agent failure taxonomy 草稿
+- 至少 1 套 Agent failure taxonomy 草稿（含可检测性标注）
+- **1 份论文 outline + related work 大纲**
 
 ---
 
@@ -430,3 +461,4 @@
   - 这个方法是不是更准
   - 它是不是更贵
   - 它是不是更值得
+- **论文导向原则**：每个实验设计时问自己"这个结果能放进论文的哪个 section"

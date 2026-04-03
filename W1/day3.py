@@ -50,7 +50,7 @@ Rules:
 - When action is finish, put the answer in final_answer.
 """
 
-
+# 这
 REFERENCE_NOTES = [
     {
         "title": "summit_note",
@@ -409,7 +409,7 @@ def build_failure_reason(
 
     return True, "success"
 
-
+# 这个函数是整个 loop 的核心，负责执行 agent 的决策、调用工具、记录历史，并在结束时评估结果和构建输出结构。
 def run_task(
     backend: AgentBackend,
     task: Task,
@@ -423,7 +423,7 @@ def run_task(
     stop_reason = "max_steps_reached"
     action_history: list[str] = []
     tool_errors: list[str] = []
-
+    # loop 预算设计得比较紧张，目的是为了制造一些失败案例，来观察模型在接近预算边界时的行为和失败模式。
     for step in range(1, max_steps + 1):
         tool_used = tool_calls > 0
         decision, tokens = backend.decide(
