@@ -349,6 +349,20 @@ def extract_numeric_tokens(text: str) -> list[str]:
     return [match.replace(",", "") for match in re.findall(r"-?\d+(?:,\d{3})*(?:\.\d+)?", text)]
 
 
+_ACTION_KEYWORDS: dict[str, set[str]] = {
+    "calculate": {"calculate", "compute", "math", "arithmetic", "add", "subtract", "multiply", "divide", "sum", "difference", "product"},
+    "search_notes": {"search", "look up", "lookup", "find", "query", "notes", "note", "retrieve"},
+    "finish": {"finish", "done", "final answer", "answer is", "submit", "result is", "the answer"},
+}
+
+
+def _check_plan_action_aligned(thought: str, action: str) -> bool:
+    """检查 thought 中是否包含与 action 语义相关的关键词。"""
+    thought_lower = thought.lower()
+    keywords = _ACTION_KEYWORDS.get(action, {action})
+    return any(kw in thought_lower for kw in keywords)
+
+
 def build_user_prompt(task: Task, history: list[dict[str, str]], tool_used: bool) -> str:
     history_lines = []
     for index, item in enumerate(history, start=1):
@@ -497,12 +511,12 @@ def run_task(
         action_history.append(action)
 
         # 对齐检测：检查 thought 里是否提到了实际要执行的 action
-        # 这是最简单的启发式判断，后续可以替换成更精确的语义匹配
+        # 用语义关键词匹配替代精确子串匹配，覆盖模型常用的自然语言同义词
         deviation_log.append({
             "step": step,
             "planned_action": thought,
             "actual_action": action,
-            "aligned": action in thought.lower(),
+            "aligned": _check_plan_action_aligned(thought, action),
         })
 
         if action == "finish":
