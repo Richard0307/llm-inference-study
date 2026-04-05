@@ -7,43 +7,43 @@
 - 模型：`Qwen/Qwen3-8B-AWQ`
 - 总记录数：`20` （2 种策略 x 10 道题）
 - 步数预算：`4`
-- Direct：`8/10` 成功（`80.00%`），平均 token `659.7`
-- CoT：`9/10` 成功（`90.00%`），平均 token `774.6`
-- CoT 比 Direct 多花 token：`114.9`
+- Direct：`8/10` 成功（`80.00%`），平均 token `658.9`
+- CoT：`9/10` 成功（`90.00%`），平均 token `794.1`
+- CoT 比 Direct 多花 token：`135.2`
 
 ### 成功任务
 | Strategy | Task ID | Type | Steps | Tokens | Plan-Action Aligned |
 |---|---|---|---|---|---|
 | `direct` | `T1` | `calculator` | `2` | `476` | `False` |
-| `direct` | `T2` | `calculator` | `2` | `446` | `False` |
+| `direct` | `T2` | `calculator` | `2` | `446` | `True` |
 | `direct` | `T3` | `search` | `2` | `472` | `False` |
-| `direct` | `T4` | `search` | `2` | `437` | `False` |
+| `direct` | `T4` | `search` | `2` | `429` | `False` |
 | `direct` | `T6` | `search` | `2` | `425` | `False` |
 | `direct` | `T7` | `calculator` | `2` | `411` | `False` |
 | `direct` | `T8` | `search` | `2` | `448` | `False` |
 | `direct` | `T9` | `search` | `2` | `430` | `False` |
-| `cot` | `T1` | `calculator` | `2` | `608` | `False` |
-| `cot` | `T2` | `calculator` | `2` | `592` | `False` |
-| `cot` | `T3` | `search` | `2` | `645` | `False` |
-| `cot` | `T4` | `search` | `2` | `578` | `False` |
+| `cot` | `T1` | `calculator` | `2` | `606` | `True` |
+| `cot` | `T2` | `calculator` | `2` | `592` | `True` |
+| `cot` | `T3` | `search` | `2` | `645` | `True` |
+| `cot` | `T4` | `search` | `2` | `578` | `True` |
 | `cot` | `T5` | `search+calculate` | `3` | `1202` | `False` |
-| `cot` | `T6` | `search` | `2` | `557` | `False` |
-| `cot` | `T7` | `calculator` | `2` | `549` | `False` |
-| `cot` | `T8` | `search` | `2` | `695` | `False` |
+| `cot` | `T6` | `search` | `2` | `557` | `True` |
+| `cot` | `T7` | `calculator` | `2` | `549` | `True` |
+| `cot` | `T8` | `search` | `2` | `695` | `True` |
 | `cot` | `T9` | `search` | `2` | `540` | `False` |
 
 ### 失败任务
 | Strategy | Task ID | Type | Failure Reason | Steps | Tokens | Plan-Action Aligned |
 |---|---|---|---|---|---|---|
-| `direct` | `T5` | `search+calculate` | `tool_execution_error: Unsupported calculator expression: {'numbers': [4200, 3100], 'operation': 'sum'}` | `4` | `1533` | `False` |
+| `direct` | `T5` | `search+calculate` | `tool_execution_error: Unsupported calculator expression: {'numbers': [4200, 3100], 'operation': 'sum'}` | `4` | `1533` | `True` |
 | `direct` | `T10` | `search+calculate` | `tool_execution_error: Unsupported calculator expression: {'a': 4200, 'b': 3100}` | `4` | `1519` | `False` |
-| `cot` | `T10` | `search+calculate` | `tool_execution_error: Unsupported calculator expression: {'a': 4200, 'b': 3100}` | `4` | `1780` | `False` |
+| `cot` | `T10` | `search+calculate` | `tool_execution_error: Unsupported calculator expression: {'a': 4200, 'b': 3100}` | `4` | `1977` | `True` |
 
 ### 分析
-- Direct：8/10 成功，平均 `659.7` token
-- CoT：9/10 成功，平均 `774.6` token
-- CoT 多花了 `114.9` token，成功率的提升是否值得？
-- plan-action 对齐：`0/20` 条（`0.00%`），低对齐率可能预示推理漂移
+- Direct：8/10 成功，平均 `658.9` token
+- CoT：9/10 成功，平均 `794.1` token
+- CoT 多花了 `135.2` token，成功率的提升是否值得？
+- plan-action 对齐：`10/20` 条（`50.00%`），低对齐率可能预示推理漂移
 - 失败原因分布：`tool_execution_error: Unsupported calculator expression: {'numbers': [4200, 3100], 'operation': 'sum'}` x 1，`tool_execution_error: Unsupported calculator expression: {'a': 4200, 'b': 3100}` x 2
 
 ---
@@ -55,46 +55,45 @@
 - Model: `Qwen/Qwen3-8B-AWQ`
 - Total records: `20` (2 strategies x 10 tasks)
 - Step budget: `4`
-- Direct: `8/10` success (`80.00%`), avg `659.7` tokens
-- CoT: `9/10` success (`90.00%`), avg `774.6` tokens
-- CoT extra token cost vs Direct: `114.9`
+- Direct: `8/10` success (`80.00%`), avg `658.9` tokens
+- CoT: `9/10` success (`90.00%`), avg `794.1` tokens
+- CoT extra token cost vs Direct: `135.2`
 
 ### Success Table
 | Strategy | Task ID | Type | Steps | Tokens | Plan-Action Aligned |
 |---|---|---|---|---|---|
 | `direct` | `T1` | `calculator` | `2` | `476` | `False` |
-| `direct` | `T2` | `calculator` | `2` | `446` | `False` |
+| `direct` | `T2` | `calculator` | `2` | `446` | `True` |
 | `direct` | `T3` | `search` | `2` | `472` | `False` |
-| `direct` | `T4` | `search` | `2` | `437` | `False` |
+| `direct` | `T4` | `search` | `2` | `429` | `False` |
 | `direct` | `T6` | `search` | `2` | `425` | `False` |
 | `direct` | `T7` | `calculator` | `2` | `411` | `False` |
 | `direct` | `T8` | `search` | `2` | `448` | `False` |
 | `direct` | `T9` | `search` | `2` | `430` | `False` |
-| `cot` | `T1` | `calculator` | `2` | `608` | `False` |
-| `cot` | `T2` | `calculator` | `2` | `592` | `False` |
-| `cot` | `T3` | `search` | `2` | `645` | `False` |
-| `cot` | `T4` | `search` | `2` | `578` | `False` |
+| `cot` | `T1` | `calculator` | `2` | `606` | `True` |
+| `cot` | `T2` | `calculator` | `2` | `592` | `True` |
+| `cot` | `T3` | `search` | `2` | `645` | `True` |
+| `cot` | `T4` | `search` | `2` | `578` | `True` |
 | `cot` | `T5` | `search+calculate` | `3` | `1202` | `False` |
-| `cot` | `T6` | `search` | `2` | `557` | `False` |
-| `cot` | `T7` | `calculator` | `2` | `549` | `False` |
-| `cot` | `T8` | `search` | `2` | `695` | `False` |
+| `cot` | `T6` | `search` | `2` | `557` | `True` |
+| `cot` | `T7` | `calculator` | `2` | `549` | `True` |
+| `cot` | `T8` | `search` | `2` | `695` | `True` |
 | `cot` | `T9` | `search` | `2` | `540` | `False` |
 
 ### Failure Table
 | Strategy | Task ID | Type | Failure Reason | Steps | Tokens | Plan-Action Aligned |
 |---|---|---|---|---|---|---|
-| `direct` | `T5` | `search+calculate` | `tool_execution_error: Unsupported calculator expression: {'numbers': [4200, 3100], 'operation': 'sum'}` | `4` | `1533` | `False` |
+| `direct` | `T5` | `search+calculate` | `tool_execution_error: Unsupported calculator expression: {'numbers': [4200, 3100], 'operation': 'sum'}` | `4` | `1533` | `True` |
 | `direct` | `T10` | `search+calculate` | `tool_execution_error: Unsupported calculator expression: {'a': 4200, 'b': 3100}` | `4` | `1519` | `False` |
-| `cot` | `T10` | `search+calculate` | `tool_execution_error: Unsupported calculator expression: {'a': 4200, 'b': 3100}` | `4` | `1780` | `False` |
+| `cot` | `T10` | `search+calculate` | `tool_execution_error: Unsupported calculator expression: {'a': 4200, 'b': 3100}` | `4` | `1977` | `True` |
 
 ### Analysis
-- Direct: 8/10 success, avg `659.7` tokens.
-- CoT: 9/10 success, avg `774.6` tokens.
-- CoT costs `114.9` more tokens on average — is the accuracy gain worth it?
-- Plan-action aligned in `0/20` records (`0.00%`). Low alignment may signal reasoning drift.
+- Direct: 8/10 success, avg `658.9` tokens.
+- CoT: 9/10 success, avg `794.1` tokens.
+- CoT costs `135.2` more tokens on average — is the accuracy gain worth it?
+- Plan-action aligned in `10/20` records (`50.00%`). Low alignment may signal reasoning drift.
 - Failure breakdown: `tool_execution_error: Unsupported calculator expression: {'numbers': [4200, 3100], 'operation': 'sum'}` x 1, `tool_execution_error: Unsupported calculator expression: {'a': 4200, 'b': 3100}` x 2
 
----
 ## 技术分析 / Technical Deep-dive
 
 ### 1. Plan-Action Aligned 为什么全是 False？
@@ -188,4 +187,3 @@ Unsupported calculator expression: {'a': 4200, 'b': 3100}
 **为什么只在 search+calculate 组合任务失败？** 单步 calculate 任务（T1、T2、T7）的 question 本身就包含 `"17 * 9 - 25"` 这样的数学表达式，模型直接照抄即可。但组合任务中，模型需要自己构造 calculator 输入，它倾向于把搜索结果封装成结构化 JSON，而非写一个简单的算术表达式。
 
 **改进方向：** 在 prompt 中明确声明工具输入格式（如 `"calculate accepts a math expression string like '4200 + 3100'"`），或加入 few-shot 示例展示正确用法。
-
