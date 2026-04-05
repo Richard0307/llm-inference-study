@@ -22,6 +22,7 @@
         3.分层Agent：一个总Agent负责拆任务，多个工作Agent各自处理一个目的地，结果汇总后再做最终决策
 
 训练出再聪明的模型，如果推理时的任务分解和资源调度设计得很差，在真实规模下一样会崩。
+
 常见的几类Agent推理失败原因:
     step_budget_exceeded_before_finish
     missing_required_actions：模型提前结束，没有按要求调用必要工具。

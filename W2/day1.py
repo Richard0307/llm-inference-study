@@ -24,11 +24,11 @@ except Exception:  # pragma: no cover - local-qwen mode should still work
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
 DEFAULT_LOCAL_MODEL = "Qwen/Qwen3-8B-AWQ"
 DEFAULT_LOCAL_BASE_URL = "http://127.0.0.1:8000/v1/chat/completions"
-DEFAULT_BACKEND = os.getenv("DAY3_BACKEND", "local-qwen")
+DEFAULT_BACKEND = os.getenv("DAY1_BACKEND", "local-qwen")
 DEFAULT_MAX_STEPS = 2
 DEFAULT_MAX_OUTPUT_TOKENS = 220
 DEFAULT_TIMEOUT_SECONDS = 60
-DEFAULT_RESULTS_PATH = pathlib.Path(__file__).resolve().parent / "day3_results.md"
+DEFAULT_RESULTS_PATH = pathlib.Path(__file__).resolve().parent / "day1_results.md"
 
 
 SYSTEM_PROMPT = """You are a minimal research agent.
@@ -50,7 +50,6 @@ Rules:
 - When action is finish, put the answer in final_answer.
 """
 
-# 这
 REFERENCE_NOTES = [
     {
         "title": "summit_note",
@@ -419,6 +418,7 @@ def run_task(
     history: list[dict[str, str]] = []
     total_tokens = 0
     tool_calls = 0
+    every_step_tokens: list[int] = []
     final_answer = ""
     stop_reason = "max_steps_reached"
     action_history: list[str] = []
@@ -435,7 +435,7 @@ def run_task(
             max_output_tokens=max_output_tokens,
         )
         total_tokens += tokens
-
+        every_step_tokens.append(tokens)
         thought = str(decision.get("thought", "")).strip()
         action = str(decision.get("action", "")).strip()
         action_input = str(decision.get("action_input", "")).strip()
@@ -482,6 +482,7 @@ def run_task(
                 "steps": step,
                 "tool_calls": tool_calls,
                 "tokens": total_tokens,
+                "every_step_tokens": every_step_tokens,
                 "stop_reason": stop_reason,
                 "history": history,
                 "action_history": action_history,
@@ -521,6 +522,7 @@ def run_task(
         "steps": max_steps,
         "tool_calls": tool_calls,
         "tokens": total_tokens,
+        "every_step_tokens": every_step_tokens,
         "stop_reason": stop_reason,
         "history": history,
         "action_history": action_history,
@@ -537,6 +539,13 @@ def render_markdown(
     success_rate = success_count / len(results)
     average_steps = statistics.mean(result["steps"] for result in results)
     average_tokens = statistics.mean(result["tokens"] for result in results)
+    all_step_tokens = []
+    for result in results:
+        # result.get比较保险，以防某些结果里没有 every_step_tokens 字段（虽然按设计应该都有）。
+        all_step_tokens.extend(result.get("every_step_tokens", []))
+    average_tokens_per_step = statistics.mean(all_step_tokens) if all_step_tokens else 0.0
+
+
     success_rows = [result for result in results if result["success"]]
     failure_rows = [result for result in results if not result["success"]]
     failure_reason_counts: dict[str, int] = {}
@@ -546,7 +555,7 @@ def render_markdown(
         )
 
     lines = [
-        "# Day 3 Minimal Agent Loop Results / Day 3 最小 Agent Loop 结果",
+        "# Day 1 Minimal Agent Loop Results / Day 1 最小 Agent Loop 结果",
         "",
         "## 中文版",
         "",
@@ -559,6 +568,7 @@ def render_markdown(
         f"- 成功率：`{success_rate:.2%}`",
         f"- 平均步骤数：`{average_steps:.2f}`",
         f"- 平均 token 消耗：`{average_tokens:.2f}`",
+        f"- 平均每步 token 消耗：`{average_tokens_per_step:.2f}`",
         f"- 当前步数预算：`{max_steps}`",
         f"- 设计目标失败率：`20.00%`",
         "",
@@ -624,6 +634,7 @@ def render_markdown(
     lines.append(f"- Success rate: `{success_rate:.2%}`")
     lines.append(f"- Average steps: `{average_steps:.2f}`")
     lines.append(f"- Average tokens: `{average_tokens:.2f}`")
+    lines.append(f"- Average tokens per step: `{average_tokens_per_step:.2f}`")
     lines.append(f"- Step budget: `{max_steps}`")
     lines.append("- Designed failure rate target: `20.00%`")
     lines.extend(["", "### Success Table"])
