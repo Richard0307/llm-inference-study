@@ -192,10 +192,16 @@
 - 当天输出：
   - `W2/decoder_block.py`（Pre-Norm 版）
   - 1 张 GPT-style Decoder Block 数据流图
+  为什么PostNorm没有PreNorm 好？/为什么现代LLM都用PreNorm or RMSNorm(去掉了均值偏移，保留方差归一化)?
+  PostNorm 是 LayerNorm(Attention(x) + x)
+  PreNorm 是 Attention(LayerNorm(x)) + x 
+  PreNorm 梯度可以通过加法走 residual path，不被Norm干扰，PostNorm每传一次梯度都会穿过Norm层才能走residual path，Norm 层会缩放梯度，多一层梯度就容易梯度爆炸或消失。
+  <br>
+    所以，PreNorm可以让梯度传得更稳，模型叠得更深，训练更容易收敛。
 - 完成标准：
   - 单个 Block 和多层 Block forward 跑通
   - 能画出 LN → Attention → Residual → LN → FFN → Residual 的数据流
-
+![alt text](../W2/decoder_block_dataflow.png)
 ### 4 月 9 日（周四）
 
 - 主任务：精读 Attention 论文剩余部分 + 为什么 Decoder-only 胜出
@@ -214,14 +220,23 @@
 - 完成标准：
   - 能闭卷解释为什么 Decoder-only 在推理上胜出
     最关键的一点是，Decoder-only的数据获取成本最低
+
+    <br>
     BatchNorm：对一个 batch 里所有样本的同一个特征维度做归一化。比如 batch 里有 32 个句子，它把这 32 个句子在同一个维度上的值拉到均值 0、方差 1。
 
     LayerNorm：对单个样本的所有特征维度做归一化。不管 batch 里有多少句子，它只看当前这一个样本自己的所有维度。
 
     为什么 Transformer 用 LayerNorm 不用 BatchNorm：序列长度在不同样本间不一样，BatchNorm 跨样本算统计量会被 padding 搞乱。LayerNorm 只看单个样本自己，不受 batch 内其他样本的影响，对变长序列更稳定。而且推理时 batch_size 可能是 1，BatchNorm 的统计量在这种情况下不可靠。
-
+    <br>
     记住一句话：BatchNorm 跨样本算，LayerNorm 跨特征算。Transformer 用 LayerNorm 是因为序列长度不一致。
     Casual Mask --> 单向注意力 ---> KV Cache (因为每个 token 只看前面的，所以前面 token 的 K 和 V 一旦算出来就不会变了。第 3 个 token 算出的 K3、V3，不管后面再来多少新 token，K3 和 V3 永远是那个值。所以你可以把它们存起来（这就是 KV Cache).
+    <br>
+    Causal Mask 下，第 1 个 token 永远只看自己：softmax([Q1·K1])。不管后面来多少新 token，这个值不变。所以输出不变，KV 可以缓存复用。
+    如果没有：那第二个token来了，第一个token权重就是softmax([Q1·K1, Q1·K2]),每来一个新的token，所有权重就会改变。
+
+    <br>
+    比方说：
+    小明 小李 小张，三个人传话，有casual mask，小明只需要记住输入的话和自己的话，小李只需要记住小明的话和自己的话，如果没有casual mask，当小张来了的时候，小明小李都要重复记一遍小张自身的话，这样对于推理来说，等于全部要重新计算一遍，极其消耗计算量
 ### 4 月 10 日（周五）
 
 - 主任务：**GPT-2 推理 Profiling（提前到 W2 做！）**
