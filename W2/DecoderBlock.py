@@ -75,3 +75,6 @@ if __name__ == "__main__":
     print(f"\nCausal mask verification:")
     print(f"  Position 0 diff: {diff:.2e}")
     print(f"  Causal mask effective: {diff < 1e-5}")
+
+# 为什么Decoder Only 会胜出呢？
+# Decoder Only 模型在自然语言处理任务中表现出色，主要原因有以下几点：

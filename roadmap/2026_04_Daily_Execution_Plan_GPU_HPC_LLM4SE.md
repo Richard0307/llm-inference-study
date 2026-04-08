@@ -213,6 +213,7 @@
   - 1 张"三种架构的推理特性对比"卡（Enc-Dec / Enc-only / Dec-only）
 - 完成标准：
   - 能闭卷解释为什么 Decoder-only 在推理上胜出
+    最关键的一点是，Decoder-only的数据获取成本最低
 
 ### 4 月 10 日（周五）
 
