@@ -214,7 +214,14 @@
 - 完成标准：
   - 能闭卷解释为什么 Decoder-only 在推理上胜出
     最关键的一点是，Decoder-only的数据获取成本最低
+    BatchNorm：对一个 batch 里所有样本的同一个特征维度做归一化。比如 batch 里有 32 个句子，它把这 32 个句子在同一个维度上的值拉到均值 0、方差 1。
 
+    LayerNorm：对单个样本的所有特征维度做归一化。不管 batch 里有多少句子，它只看当前这一个样本自己的所有维度。
+
+    为什么 Transformer 用 LayerNorm 不用 BatchNorm：序列长度在不同样本间不一样，BatchNorm 跨样本算统计量会被 padding 搞乱。LayerNorm 只看单个样本自己，不受 batch 内其他样本的影响，对变长序列更稳定。而且推理时 batch_size 可能是 1，BatchNorm 的统计量在这种情况下不可靠。
+
+    记住一句话：BatchNorm 跨样本算，LayerNorm 跨特征算。Transformer 用 LayerNorm 是因为序列长度不一致。
+    Casual Mask --> 单向注意力 ---> KV Cache (因为每个 token 只看前面的，所以前面 token 的 K 和 V 一旦算出来就不会变了。第 3 个 token 算出的 K3、V3，不管后面再来多少新 token，K3 和 V3 永远是那个值。所以你可以把它们存起来（这就是 KV Cache).
 ### 4 月 10 日（周五）
 
 - 主任务：**GPT-2 推理 Profiling（提前到 W2 做！）**
