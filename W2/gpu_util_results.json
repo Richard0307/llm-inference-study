@@ -1,0 +1,30 @@
+{
+  "idle": {
+    "label": "IDLE baseline",
+    "count": 5,
+    "sm_avg": 1.4,
+    "sm_max": 4.0,
+    "mem_avg": 1.4,
+    "mem_max": 7.0,
+    "pwr_avg": 32.0,
+    "pclk_avg": 1815.0
+  },
+  "decode": {
+    "label": "DECODE bs=1",
+    "count": 20,
+    "sm_avg": 64.6,
+    "sm_max": 74.0,
+    "mem_avg": 41.9,
+    "mem_max": 49.0,
+    "pwr_avg": 93.0,
+    "pclk_avg": 2342.0
+  },
+  "throughput_tok_per_sec": 405.8,
+  "total_tokens": 8116,
+  "config": {
+    "batch_size": 1,
+    "prompt_len": 64,
+    "gen_len": 64,
+    "sample_duration_sec": 20
+  }
+}
