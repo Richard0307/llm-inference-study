@@ -1,0 +1,50 @@
+[
+  {
+    "prompt_len": 32,
+    "gen_len": 64,
+    "prefill_ms": 2.51,
+    "decode_ms": 134.5,
+    "total_ms": 137.01,
+    "decode_ratio_pct": 98.2,
+    "e2e_generate_ms": 192.92,
+    "decode_per_token_ms": 2.1,
+    "prefill_tokens_per_sec": 12770.9,
+    "decode_tokens_per_sec": 475.8
+  },
+  {
+    "prompt_len": 64,
+    "gen_len": 64,
+    "prefill_ms": 2.62,
+    "decode_ms": 131.47,
+    "total_ms": 134.1,
+    "decode_ratio_pct": 98.0,
+    "e2e_generate_ms": 163.95,
+    "decode_per_token_ms": 2.05,
+    "prefill_tokens_per_sec": 24389.8,
+    "decode_tokens_per_sec": 486.8
+  },
+  {
+    "prompt_len": 128,
+    "gen_len": 64,
+    "prefill_ms": 2.85,
+    "decode_ms": 132.7,
+    "total_ms": 135.55,
+    "decode_ratio_pct": 97.9,
+    "e2e_generate_ms": 167.65,
+    "decode_per_token_ms": 2.07,
+    "prefill_tokens_per_sec": 44850.4,
+    "decode_tokens_per_sec": 482.3
+  },
+  {
+    "prompt_len": 256,
+    "gen_len": 64,
+    "prefill_ms": 4.58,
+    "decode_ms": 132.72,
+    "total_ms": 137.3,
+    "decode_ratio_pct": 96.7,
+    "e2e_generate_ms": 171.5,
+    "decode_per_token_ms": 2.07,
+    "prefill_tokens_per_sec": 55946.8,
+    "decode_tokens_per_sec": 482.2
+  }
+]

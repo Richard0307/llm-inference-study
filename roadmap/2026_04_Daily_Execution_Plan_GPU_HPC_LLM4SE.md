@@ -296,7 +296,7 @@
   - 整理 W2 mini memo：
     - Decoder Block 实现
     - Profiling 数据
-    - 显存计算器验证
+    
   - 写下 W3 假设：
     - 假设：batch_size=1 时 GPU 利用率 < 30%
   - 准备 W3 所需工具：`nvidia-smi dmon`
