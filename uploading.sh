@@ -25,9 +25,9 @@ echo "正在清理并准备上传列表..."
 # 第一步：先把所有东西都加入暂存区
 git add .
 
-# 第二步：强制从暂存区中“拿掉” .gitignore
-# 无论它是已跟踪文件还是新加入的未跟踪文件，都不要把它带进 commit
-git reset -q HEAD -- .gitignore >/dev/null 2>&1 || true
+# 第二步：强制从暂存区中“拿掉”不想上传的文件
+# 无论它们是已跟踪文件还是新加入的未跟踪文件，都不要把它们带进 commit
+git reset -q HEAD -- .gitignore uploading.sh >/dev/null 2>&1 || true
 
 # --- 核心修复逻辑结束 ---
 
