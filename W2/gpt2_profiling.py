@@ -9,8 +9,7 @@ import torch
 import time
 import json
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
-
-
+import torch.cuda.nvtx as nvtx
 # ── Config ──
 MODEL_PATH = "W2/gpt2_model/AI-ModelScope/gpt2"
 PROMPT_LENGTHS = [32, 64, 128, 256]
@@ -46,7 +45,9 @@ def measure_prefill(model, input_ids):
 
     with torch.no_grad():
         start.record()
+        nvtx.range_push("prefill")
         outputs = model(input_ids, use_cache=True)
+        nvtx.range_pop() 
         end.record()
 
     torch.cuda.synchronize()
@@ -64,10 +65,14 @@ def measure_decode(model, input_ids, past_key_values, gen_length):
 
     with torch.no_grad():
         start.record()
-        for _ in range(gen_length):
+        for step in range(gen_length):
+            if step == 10:
+                nvtx.range_push("decode_step") # Only test the 10th steps
             outputs = model(next_token, past_key_values=kv_cache, use_cache=True)
             kv_cache = outputs.past_key_values
             next_token = outputs.logits[:, -1, :].argmax(dim=-1, keepdim=True)
+            if step == 10:
+                nvtx.range_pop()
         end.record()
 
     torch.cuda.synchronize()
@@ -225,22 +230,73 @@ def run_torch_profiler(model, tokenizer):
     print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=15))
 
 
+def load_model_precision(precision):
+    """Load GPT-2 in the requested precision: fp32 / fp16 / int8."""
+    print(f"Loading GPT-2 from {MODEL_PATH} on {DEVICE} (precision={precision})...")
+    tokenizer = GPT2Tokenizer.from_pretrained(MODEL_PATH)
+    tokenizer.pad_token = tokenizer.eos_token
+    if precision == "fp32":
+        model = GPT2LMHeadModel.from_pretrained(MODEL_PATH).to(DEVICE)
+    elif precision == "fp16":
+        model = GPT2LMHeadModel.from_pretrained(MODEL_PATH, torch_dtype=torch.float16).to(DEVICE)
+    elif precision == "int8":
+        from transformers import BitsAndBytesConfig
+        bnb_cfg = BitsAndBytesConfig(load_in_8bit=True)
+        model = GPT2LMHeadModel.from_pretrained(MODEL_PATH, quantization_config=bnb_cfg, device_map="auto")
+    else:
+        raise ValueError(f"unknown precision: {precision}")
+    model.eval()
+    n_params = sum(p.numel() for p in model.parameters()) / 1e6
+    print(f"Model loaded. Parameters: {n_params:.1f}M, dtype_sample={next(model.parameters()).dtype}")
+    return model, tokenizer
+
+
+def run_ncu_target(precision="fp32"):
+    """Minimal entry point for ncu profiling. Only runs prefill + 11 decode steps."""
+    model, tokenizer = load_model_precision(precision)
+    input_ids = make_input(tokenizer, 128)
+    print(f"[ncu] input shape: {tuple(input_ids.shape)}")
+
+    print("[ncu] warmup...")
+    with torch.no_grad():
+        out = model(input_ids, use_cache=True)
+        kv = out.past_key_values
+        tok = input_ids[:, -1:]
+        for _ in range(5):
+            out = model(tok, past_key_values=kv, use_cache=True)
+            kv = out.past_key_values
+            tok = out.logits[:, -1, :].argmax(dim=-1, keepdim=True)
+
+    print("[ncu] measured prefill (nvtx range: prefill)")
+    measure_prefill(model, input_ids)
+    _, kv = measure_prefill(model, input_ids)
+
+    print("[ncu] measured decode (nvtx range: decode_step, step=10)")
+    measure_decode(model, input_ids, kv, gen_length=12)
+
+    print("[ncu] done")
+
+
 if __name__ == "__main__":
-    model, tokenizer = load_model()
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "ncu":
+        precision = sys.argv[2] if len(sys.argv) > 2 else "fp32"
+        run_ncu_target(precision)
+    else:
+        model, tokenizer = load_model()
+        # 1. Prefill vs Decode profiling
+        results = run_profiling(model, tokenizer)
+        print_table(results)
+        verify_hypothesis(results)
 
-    # 1. Prefill vs Decode profiling
-    results = run_profiling(model, tokenizer)
-    print_table(results)
-    verify_hypothesis(results)
+        # 2. Chrome trace
+        run_torch_profiler(model, tokenizer)
 
-    # 2. Chrome trace
-    run_torch_profiler(model, tokenizer)
+        # 3. Save results to JSON
+        with open("W2/gpt2_profiling_results.json", "w") as f:
+            json.dump(results, f, indent=2)
+        print("\nResults saved to W2/gpt2_profiling_results.json")
 
-    # 3. Save results to JSON
-    with open("W2/gpt2_profiling_results.json", "w") as f:
-        json.dump(results, f, indent=2)
-    print("\nResults saved to W2/gpt2_profiling_results.json")
-
-    # 4. Peak GPU memory
-    peak_mem = torch.cuda.max_memory_allocated() / 1024**2
-    print(f"Peak GPU memory: {peak_mem:.1f} MB")
+        # 4. Peak GPU memory
+        peak_mem = torch.cuda.max_memory_allocated() / 1024**2
+        print(f"Peak GPU memory: {peak_mem:.1f} MB")
