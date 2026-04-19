@@ -137,15 +137,30 @@
   - 283. Move Zeroes（Easy）
 - **论文（1h）：** ThinkRouter pilot 数据汇总（GSM8K ~2% gap、MMLU 0% gap、MATH L5 ~11% gap）
 
-### 4/19 周六 — W3 收尾 + W4 假设
+### 4/19 周日 — 病后恢复 + W3 最小收尾（重做版）
 
-- **工程（2h）：** W3 收尾：Roofline 笔记、GPU 内存层级、Docker + FastAPI hello-world 全部完成。
-- **MLOps（1h）：** 写 W4 假设：KV Cache 在 seq_len > 256 时给出 >2x decode 加速。
-- **LeetCode（1h）— 双指针 Day 2：**
+> **情况说明：** 4/15 - 4/18 因身体原因中断。W3 工程主体（Roofline 分析、GPU 内存层级、ncu profiling fp32/fp16/int8、precision latency 对比）在病前已基本完成。
+> **今日策略：** 恢复节奏 + 锁定 W3 产出；**不补欠账**，MLOps 与漏做的 LC 题合并到 W4 推进。
+
+- **工程（1.5h）— W3 收尾：**
+  - 写 `W3/w3_memo.md`：总结 Roofline 分析结论、GPU 内存层级图、fp32/fp16/int8 latency 对比、关键洞察（decode memory-bound、真实 FLOPs 利用率 < 5%）。
+  - 只做总结,不再新增实验。
+- **W4 铺垫（0.5h）：** 把 W4 假设写进 `W3/w3_memo.md` 末尾或新建 `W4/W4_hypothesis.md`：**KV Cache 在 seq_len ≥ 256 时给出 >2x decode 加速**。
+- **LeetCode（1h）— 双指针 Day 2（跳过欠账题）：**
   - 125. Valid Palindrome（Easy）
   - 344. Reverse String（Easy）
   - 167. Two Sum II - Input Array Is Sorted（Medium）
-- **产出：** `W3/w3_memo.md`、本周知乎/公众号博客
+  - *哈希表 Day 2-4 的 6 题 + 双指针 Day 1 的 3 题欠账不补,继续往前走,避免陷在"补课模式"里。*
+- **今日不做（已下调预期）：**
+  - ❌ Docker Compose / FastAPI / Pydantic — 合并到 W4 的 LLM 服务化里
+  - ❌ 本周知乎/公众号博客 — 推迟到 W4 末
+  - ❌ 论文副线（ThinkRouter）— 精力允许再说,不强求
+- **产出：** `W3/w3_memo.md`（含 W4 假设）
+
+**节奏调整（后续一周指引）：**
+- 原定 4/15 - 4/18 的 MLOps（Docker Compose + FastAPI + Pydantic + 集成）并入 W4:4/22 / 4/25 的 MLOps 时段扩展承接。
+- W4 主时间轴（4/20 - 4/26）保持不变,但允许 KV Cache benchmark 结论在 4/27 - 4/28 之间产出,不强求 4/24 完成。
+- 月底 checklist 目标不变:KV Cache 验证 + 一个可部署的 FastAPI LLM 服务。
 
 ---
 
@@ -283,4 +298,4 @@
 
 ---
 
-*最后更新：2026-04-15*
+*最后更新：2026-04-19（病后恢复,4/19 周日重做）*
