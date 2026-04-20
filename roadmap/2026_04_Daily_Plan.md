@@ -147,9 +147,9 @@
   - 只做总结,不再新增实验。
 - **W4 铺垫（0.5h）：** 把 W4 假设写进 `W3/w3_memo.md` 末尾或新建 `W4/W4_hypothesis.md`：**KV Cache 在 seq_len ≥ 256 时给出 >2x decode 加速**。
 - **LeetCode（1h）— 双指针 Day 2（跳过欠账题）：**
-  - 125. Valid Palindrome（Easy）
-  - 344. Reverse String（Easy）
-  - 167. Two Sum II - Input Array Is Sorted（Medium）
+  - ✅ 125. Valid Palindrome（Easy）
+  - ✅ 344. Reverse String（Easy）
+  - ✅ 167. Two Sum II - Input Array Is Sorted（Medium）
   - *哈希表 Day 2-4 的 6 题 + 双指针 Day 1 的 3 题欠账不补,继续往前走,避免陷在"补课模式"里。*
 - **今日不做（已下调预期）：**
   - ❌ Docker Compose / FastAPI / Pydantic — 合并到 W4 的 LLM 服务化里

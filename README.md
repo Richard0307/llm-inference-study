@@ -1,93 +1,144 @@
-# Research Paper Reading Archive
+# llm-inference-study
 
-## 1. Repository Purpose
+> A hands-on study of LLM inference performance — from Transformer internals to deployment.
+> Built from scratch on a single RTX 4090 Laptop (16 GB GDDR6X). Reproducible benchmarks, FastAPI serving, Docker.
 
-本目录用于系统记录本人在不同时间段内的论文阅读过程、核心结论与阶段性理解，作为后续科研选题、研究复现、学术写作与方向规划的基础材料库。
+![Python 3.14](https://img.shields.io/badge/python-3.14-blue)
+![PyTorch 2.11](https://img.shields.io/badge/pytorch-2.11%2Bcu128-ee4c2c)
+![GPU RTX 4090 Laptop](https://img.shields.io/badge/GPU-RTX%204090%20Laptop%2016GB-76b900)
+![Status WIP](https://img.shields.io/badge/status-WIP-yellow)
 
-与一般的“读后感式”记录不同，这里的笔记更强调以下几点：
+---
 
-- 对论文问题意识的提炼
-- 对方法设计逻辑的拆解
-- 对实验设置与结论可信度的判断
-- 对后续研究方向的启发与可迁移性分析
+## TL;DR — Three Findings That Drove Every Design Decision
 
-因此，本目录不仅是阅读痕迹的保存空间，也是一个持续更新的个人学术认知档案。
+| Finding | Number | Implication |
+|---|---:|---|
+| Decode dominates total inference time | **96.7 – 98.2 %** | Optimization must target decode, not prefill |
+| Decode arithmetic intensity vs RTX 4090 ridge point | **0.5** vs **57.3** FLOPs/byte | Decode is **115× below** the compute roof — pure memory-bound |
+| Decode real FLOPs utilization | **0.36 %** | The GPU spends 99.6 % of decode time waiting on HBM, not computing |
 
-## 2. Main Function
+**Conclusion:** Switching precision (FP16/INT8) cannot fix decode latency on its own.
+The only way out is to **raise arithmetic intensity** — via KV cache, batching, and serving-level tricks.
 
-本目录主要用于记录以下内容：
+This is exactly what the project builds out, week by week.
 
-- 每日或阶段性阅读了哪些论文
-- 每篇论文关注的问题、方法与贡献
-- 阅读过程中产生的疑问、批判性判断与延伸思考
-- 与本人研究兴趣相关的可复现点、可比较点与可继续追踪的线索
+---
 
-简而言之，本目录服务于一个长期目标：
+## Visual Summary
 
-**将零散的论文阅读，沉淀为可检索、可比较、可复用的研究积累。**
+| | |
+|---|---|
+| ![Roofline](docs/figures/roofline_chart.png) | ![GPU memory hierarchy](docs/figures/gpu_memory_hierarchy.png) |
+| **GPT-2 on RTX 4090 Laptop Roofline** — decode sits 115× below the ridge point. | **GPU memory hierarchy** — why HBM bandwidth, not FLOPs, is the bottleneck. |
+| ![Precision latency](docs/figures/precision_latency_comparison.png) | ![NCU utilization](docs/figures/ncu_utilization_comparison.png) |
+| **FP32 vs FP16 vs INT8** — precision alone barely moves decode latency. | **NCU SM / memory utilization** — confirms the memory-bound diagnosis. |
 
-## 3. Recording Principle
+GPT-2 decoder block data flow: [decoder_block_dataflow.png](docs/figures/decoder_block_dataflow.png)
 
-建议后续笔记尽量遵循以下原则：
+---
 
-- `Problem-driven`：先写论文试图解决什么问题，而不是先堆公式或模型名
-- `Method-aware`：重点解释方法为什么成立，而不是只摘抄模块结构
-- `Evidence-based`：关注实验是否真正支撑论文结论
-- `Research-oriented`：记录这篇论文对自己未来课题可能带来的启发
+## Quickstart
 
-## 4. Suggested Note Structure
+> ⚠️ Active development. The skeleton below is the target. Items marked 🚧 are in progress.
 
-每篇论文笔记可以围绕以下维度展开：
+```bash
+# 1. Clone
+git clone https://github.com/Richard0307/llm-inference-study.git
+cd llm-inference-study
 
-1. 论文基本信息  
-   标题、作者、会议/期刊、年份、链接
+# 2. Reproduce profiling (W2)
+python journal/W2/gpt2_profiling.py
 
-2. 研究问题  
-   论文试图回答什么问题，该问题为什么重要
+# 3. Reproduce roofline analysis (W3)
+python journal/W2/roofline_analysis.py
 
-3. 核心方法  
-   方法框架、关键模块、训练/推理机制、与已有工作的区别
+# 4. 🚧 Run FastAPI serving (W4 in progress)
+cd journal/W4 && uvicorn server:app --port 8000
+curl -X POST http://localhost:8000/generate \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"Once upon a time","max_new_tokens":30}'
+```
 
-4. 实验与结果  
-   数据集、指标、对比方法、主要结论、是否具有说服力
+---
 
-5. 个人理解  
-   论文真正有效的原因、可能的局限、与自己方向的关系
+## Benchmarks
 
-6. 延伸思考  
-   是否值得复现、是否可以迁移到自己的任务、是否值得继续跟踪相关文献
+Hardware: RTX 4090 Laptop GPU (16 GB GDDR6X, 576 GB/s HBM, 33 TFLOPs FP32 peak).
+Model: GPT-2 124M (HuggingFace checkpoint).
 
-## 5. Naming Convention
+| Experiment | Result | Where |
+|---|---|---|
+| Prefill vs decode time share | decode **96.7 – 98.2 %** | [journal/W2/decoder_profiling_memo.md](journal/W2/decoder_profiling_memo.md) |
+| Roofline placement | AI = 0.5, ridge = 57.3 → memory-bound | [journal/W3/w3_memo.md](journal/W3/w3_memo.md) |
+| Decode FLOPs utilization | **0.36 %** of peak FP32 | [journal/W3/w3_memo.md](journal/W3/w3_memo.md) |
+| FP32 / FP16 / INT8 latency | precision alone gives marginal decode speedup | [journal/W3/precision_latency.json](journal/W3/precision_latency.json) |
+| 🚧 KV cache speedup vs seq_len | hypothesis: > 2× at seq_len ≥ 256 | W4, in progress |
+| 🚧 KV cache memory growth | formula vs measured, find OOM boundary | W4, in progress |
 
-为便于检索与时间排序，建议文件命名尽量保持统一。可采用如下格式：
+Raw data: [journal/W3/](journal/W3/) (ncu CSVs, latency JSONs).
 
-- `YYYY_MM_DD_PaperName.md`
-- `YYYY_MM_DD_Area_PaperName.md`
+---
 
-例如：
+## Deep Dives
 
-- `2026_03_29_Transformer.md`
-- `2026_04_02_LLM_QLoRA.md`
+The polished, portfolio-facing writeups will live under `docs/`. Until those are factored out from the journal, the canonical writeups are:
 
-## 6. Scope of This Archive
+- **Decoder-only architecture** — why GPT-style won → [journal/W2/blog_decoder_only.md](journal/W2/blog_decoder_only.md)
+- **Profiling: where does the time go?** → [journal/W2/decoder_profiling_memo.md](journal/W2/decoder_profiling_memo.md)
+- **Roofline analysis on RTX 4090 Laptop** → [journal/W3/w3_memo.md](journal/W3/w3_memo.md) ([English version](journal/W3/w3_memo_en.md))
+- **Precision study (FP32/FP16/INT8)** → [journal/W3/](journal/W3/)
+- **🚧 KV cache implementation + benchmark** → coming in W4
 
-本目录原则上可涵盖但不限于以下方向：
+---
 
-- Large Language Models
-- Efficient Fine-tuning
-- Inference and Deployment
-- AI Systems and Performance Optimization
-- Multimodal Learning
-- Continual Learning
+## Roadmap
 
-如果后续阅读范围进一步扩大，也可继续沿此结构扩展，而无需改变目录的总体定位。
+| Phase | Theme | Key Deliverables | Status |
+|---|---|---|:---:|
+| W1 (Apr 1–5) | Transformer foundations | hand-written attention, multi-head attention | ✅ |
+| W2 (Apr 7–11) | Decoder block + profiling | LayerNorm/PreNorm/DecoderBlock, GPT-2 prefill/decode profiling | ✅ |
+| W3 (Apr 13–19) | Roofline + GPU memory + precision | Roofline analysis, ncu profiling at FP32/FP16/INT8 | ✅ |
+| W4 (Apr 20–26) | **KV cache + FastAPI serving** | KV cache from scratch, benchmark, FastAPI `/generate` | 🚧 in progress |
+| W5 | Docker + monitoring + batching | Containerized service, Prometheus metrics, dynamic batching | ⏭ |
+| W6 | vLLM comparison | Throughput/latency vs hand-rolled serving | ⏭ |
+| W7+ | PagedAttention, quantization, streaming | Paper reproductions, advanced serving features | ⏭ |
 
-## 7. Final Remark
+Detailed daily plan: [roadmap/2026_04_Daily_Plan.md](roadmap/2026_04_Daily_Plan.md)
 
-论文笔记的价值不在于“记录得多”，而在于是否能够逐渐形成：
+---
 
-- 对某一研究方向的连续理解
-- 对经典工作与近期工作的纵向比较
-- 对个人研究兴趣与能力边界的清晰认知
+## Repository Tour
 
-因此，本目录的建设目标不是简单归档，而是逐步形成一个能够支撑未来科研训练与职业发展的个人学术知识库。
+```
+llm-inference-study/
+├── README.md            ← you are here
+├── docs/                ← polished, portfolio-facing writeups (WIP — being factored out from journal/)
+│   └── figures/         ← key figures referenced in this README
+├── src/                 ← reusable Python modules (WIP — being factored out from journal/W*)
+│   ├── model/           ← LayerNorm, PreNorm, DecoderBlock
+│   ├── profiling/       ← profiling + roofline scripts
+│   ├── kvcache/         ← KV cache implementation (W4)
+│   └── serving/         ← FastAPI serving (W4)
+├── benchmarks/          ← reproducible benchmark scripts and result data
+├── tests/               ← pytest, numerical-equivalence checks
+├── docker/              ← Dockerfiles for serving and benchmarking
+├── journal/             ← weekly study log (W1–W4); the chronological source of truth
+├── papers/              ← reading notes on Transformer / LLM-Agent papers
+├── roadmap/             ← multi-month study plan
+└── requirements.txt
+```
+
+---
+
+## Why This Project Exists
+
+This is a personal study project preparing for ML/AI infrastructure roles. The goal is not just to *use* LLMs but to **understand and measure** what makes them slow, where the bandwidth and compute go, and how serving systems claw performance back. Every claim in this README is backed by a number measured on the hardware listed above, with a script that reproduces it.
+
+If you are a hiring manager: the [W2 profiling memo](journal/W2/decoder_profiling_memo.md) and [W3 roofline memo](journal/W3/w3_memo.md) are the two artifacts that best show how I think about a performance problem end to end.
+
+---
+
+## License
+
+MIT
